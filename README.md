@@ -2,7 +2,7 @@
 
 講義が終わったあとに、選択式の質問に答えるだけで「課題・小テスト・復習」を記録する、大学生向けのWebアプリです。
 
-- 公開先：GitHub Pages（`https://mrayt-ux.github.io/koma-tasks/`）
+- 公開先：GitHub Pages（`https://kotori-web.github.io/koma-tasks/`）
 - ログインとデータ保存：Firebase（Googleログイン・Cloud Firestore、無料のSparkプラン）
 - `firebase-config.js` が未設定（`null`）のときは、ログインなしでブラウザの中にだけ保存します。
 
@@ -22,7 +22,7 @@
 3. Firestore Database を作成（場所：`asia-northeast1`、本番環境モード）
 4. Firestore Database → ルール に `firestore.rules` の中身を貼り付けて公開する
 5. プロジェクトの設定 → マイアプリ → ウェブアプリを追加し、表示された `firebaseConfig` の中身を `firebase-config.js` に入れる
-6. Authentication → 設定 → 承認済みドメイン に `mrayt-ux.github.io` を追加する
+6. Authentication → 設定 → 承認済みドメイン に `kotori-web.github.io` を追加する
 
 ## データの保存場所
 
