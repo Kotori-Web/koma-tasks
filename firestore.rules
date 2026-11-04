@@ -1,7 +1,11 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 各ユーザーは users/<自分のuid> の1件だけを読み書きできる。他人のデータは読めない。
+    // プランナーのアプリ用（同じ Firebase プロジェクト「planner」で使っている分。消さないこと）
+    match /planners/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    // 講義タスク帳用：各ユーザーは users/<自分のuid> の1件だけを読み書きできる
     match /users/{uid} {
       allow read, delete: if request.auth != null && request.auth.uid == uid;
       allow create, update: if request.auth != null && request.auth.uid == uid
@@ -9,9 +13,6 @@ service cloud.firestore {
         && request.resource.data.json is string
         && request.resource.data.json.size() < 500000;
     }
-    // それ以外はすべて拒否
-    match /{document=**} {
-      allow read, write: if false;
-    }
+    // ここに書いていない場所は、すべて読み書きできない（Firestore の初期動作）
   }
 }
