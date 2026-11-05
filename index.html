@@ -527,6 +527,26 @@ details.panel { border-radius: 12px; }
 .ttp .ttend { opacity: 0.7; }
 .ttp .ttend { text-align: center; }
 .ttp .ttend::before { content: "〜"; display: block; line-height: 1; font-size: 9px; text-align: center; }
+
+/* 講義を追加・時限の時刻（講義後チェックと同じ枠の画面） */
+body.modal #lsbar, body.modal #exbar { display: none !important; }
+.addc { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.addc-plus { font-weight: 400; }
+.ttfoot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.link.quiet { color: var(--muted); font-size: 12.5px; }
+.qnote { font-weight: 400; font-size: 13px; color: var(--muted); }
+.pick { display: grid; gap: 4px; font-size: 12px; }
+.pickh, .pickp { text-align: center; color: var(--muted); align-self: center; }
+.pickc { min-height: 40px; border-radius: 8px; border: 1px dashed var(--line-strong); background: none; color: var(--muted); font: inherit; font-size: 10.5px; line-height: 1.2; padding: 2px; cursor: pointer; overflow: hidden; overflow-wrap: anywhere; }
+.pickc.taken { border-style: solid; border-color: transparent; background: var(--line); }
+.pickc.on { border: 0; background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.opt.small { min-height: 40px; padding: 0 12px; }
+.ptrows { display: grid; gap: 8px; }
+.ptrow { display: grid; grid-template-columns: 2.6em auto auto auto; gap: 8px; align-items: center; justify-content: start; }
+.ptrow .til { color: var(--muted); }
+.tsel { display: inline-flex; align-items: center; gap: 2px; }
+.tsel select { min-width: 0; padding: 0 6px; font-variant-numeric: tabular-nums; }
+.ptlinks { gap: 4px 16px; }
 </style>
 
 <main class="wrap">
@@ -557,6 +577,8 @@ details.panel { border-radius: 12px; }
   <section class="hero" id="banner" hidden aria-label="次にやること"></section>
 
   <section class="ci" id="checkin" hidden aria-label="講義後チェック"></section>
+
+  <section class="ci" id="sheetview" hidden></section>
 
   <div id="main">
 
@@ -628,13 +650,13 @@ details.panel { border-radius: 12px; }
         <p id="emptytxt">下の表の「＋」を押して、講義を入れます。動きを見たいだけなら、例を入れて試せます（あとで削除できます）。</p>
         <div class="nav" id="emptyacts"><button type="button" class="btn" id="sample">例を入れて試す</button></div>
       </div>
-      <h2 id="courses-h" class="sh">週の表（「＋」で講義を入れる・講義を押すと設定）</h2>
+      <div class="shrow"><h2 id="courses-h" class="sh">週の表（＋で入れる・押すと設定）</h2><button type="button" class="btn small addc" id="addc"><span class="addc-plus" aria-hidden="true">＋</span>講義を追加</button></div>
       <div class="ocrbox" id="ocr" hidden></div>
       <div class="ttable-wrap" id="ttable"></div>
       <h2 class="sh">講義の一覧</h2>
       <p class="foot">曜日と時限を入れた講義は、その講義が終わった後に「講義後チェック」で聞かれます。</p>
       <ul class="items" id="clist" hidden></ul>
-      <form class="cform" id="cform" autocomplete="off">
+      <form class="cform" id="cform" autocomplete="off" hidden>
         <input type="text" id="c-name" maxlength="40" aria-label="講義名" placeholder="講義名を入力">
         <button type="submit" class="btn">講義を追加</button>
       </form>
@@ -706,6 +728,15 @@ details.panel { border-radius: 12px; }
   var PERIOD_END = [0, 620, 720, 870, 970, 1070, 1170];
   // Period start times (1限 8:50 ... 6限 18:00).
   var PERIOD_START = [0, 530, 630, 780, 880, 980, 1080];
+  // Default period times as [start, end] minutes; a person can change them (state.pt).
+  var DEFAULT_PT = [[530, 620], [630, 720], [780, 870], [880, 970], [980, 1070], [1080, 1170]];
+  function periodTimes() { return state.pt && state.pt.length ? state.pt : DEFAULT_PT; }
+  function applyPeriods() {
+    var pt = periodTimes();
+    PERIOD_START = [0].concat(pt.map(function (x) { return x[0]; }));
+    PERIOD_END = [0].concat(pt.map(function (x) { return x[1]; }));
+  }
+  function hm(m) { return pad(Math.floor(m / 60)) + ':' + pad(m % 60); }
 
   var state = { v: 3, courses: [], items: [], cc: {} };
   var ui = {
@@ -955,6 +986,12 @@ details.panel { border-radius: 12px; }
     }
     var itemIds = {};
     out.items.forEach(function (i) { itemIds[i.id] = 1; });
+    if (Array.isArray(d.pt) && d.pt.length >= 1 && d.pt.length <= 9) {
+      var okPt = d.pt.every(function (x, i) {
+        return Array.isArray(x) && x.length === 2 && x.every(function (v) { return Math.floor(v) === v && v >= 0 && v < 1440; }) && x[0] < x[1] && (i === 0 || d.pt[i - 1][1] <= x[0]);
+      });
+      if (okPt) out.pt = d.pt.map(function (x) { return [x[0], x[1]]; });
+    }
     if (d.sw && typeof d.sw === 'object') {
       var oldSw = ymd(addDays(todayDate(), -30));
       Object.keys(d.sw).forEach(function (k) {
@@ -1032,7 +1069,8 @@ details.panel { border-radius: 12px; }
         return o;
       }),
       cc: s.cc,
-      sw: s.sw || {}
+      sw: s.sw || {},
+      pt: s.pt && s.pt.length ? s.pt.map(function (x) { return [x[0], x[1]]; }) : undefined
     };
   }
   // Browser copy. With an account it is kept per person (LS_KEY:<id>), so two people on one browser never mix;
@@ -1775,7 +1813,7 @@ details.panel { border-radius: 12px; }
     var needSat = cands.some(function (r) { return r.day === 6; }) || cs.some(function (c) { return slotsOf(c).some(function (v) { return Math.floor(v / 10) === 6; }); });
     var need6 = cands.some(function (r) { return r.period === 6; }) || cs.some(function (c) { return slotsOf(c).some(function (v) { return v % 10 === 6; }); });
     if (ui.ttFull || needSat) days.push(6);
-    var maxP = ui.ttFull || need6 ? 6 : 5;
+    var maxP = ui.ttFull ? Math.max(6, periodTimes().length) : (need6 ? 6 : Math.min(5, periodTimes().length));
     cs.forEach(function (c) { slotsOf(c).forEach(function (v) { if (v % 10 > maxP) maxP = v % 10; }); });
     var wdNow = todayDate().getDay();
     var g = h('div', { class: 'ttable', style: 'grid-template-columns: 28px repeat(' + days.length + ', minmax(0, 1fr))' });
@@ -1818,7 +1856,11 @@ details.panel { border-radius: 12px; }
       });
     }
     box.appendChild(g);
-    if (!(needSat && need6)) box.appendChild(h('button', { type: 'button', class: 'link', text: ui.ttFull ? (needSat ? '6限を隠す' : need6 ? '土曜を隠す' : '土曜・6限を隠す') : (needSat ? '6限も表示する' : need6 ? '土曜も表示する' : '土曜・6限も表示する'), onclick: function () { ui.ttFull = !ui.ttFull; render(); } }));
+    var foot = h('div', { class: 'ttfoot' });
+    if (!(needSat && need6)) foot.appendChild(h('button', { type: 'button', class: 'link', text: ui.ttFull ? (needSat ? '6限を隠す' : need6 ? '土曜を隠す' : '土曜・6限を隠す') : (needSat ? '6限も表示する' : need6 ? '土曜も表示する' : '土曜・6限も表示する'), onclick: function () { ui.ttFull = !ui.ttFull; render(); } }));
+    else foot.appendChild(h('span'));
+    foot.appendChild(h('button', { type: 'button', class: 'link quiet', text: '時限の時刻を変える', onclick: function () { openSheet('pt'); } }));
+    box.appendChild(foot);
     if (ui.addSlot) {
       var sh = slotSheet(ui.addSlot);
       box.appendChild(sh);
@@ -2748,10 +2790,148 @@ details.panel { border-radius: 12px; }
 
   }
 
+
+  // ---------- full-screen sheets: add a class / period times ----------
+  function openSheet(kind) {
+    ui.sheet = kind;
+    ui.sheetMsg = '';
+    if (kind === 'pt') ui.ptDraft = periodTimes().map(function (x) { return [x[0], x[1]]; });
+    if (kind === 'add') ui.addDraft = { name: '', slots: [], od: -1, odOn: false, room: '' };
+    render();
+    window.scrollTo(0, 0);
+  }
+  function closeSheet() { ui.sheet = null; render(); }
+  function timeSelect(val, onChange, label) {
+    var hh = h('select', { 'aria-label': label + '（時）' }, Array.apply(null, Array(24)).map(function (_, i) { return h('option', { value: String(i), text: pad(i) }); }));
+    var mm = h('select', { 'aria-label': label + '（分）' }, Array.apply(null, Array(60)).map(function (_, i) { return h('option', { value: String(i), text: pad(i) }); }));
+    hh.value = String(Math.floor(val / 60));
+    mm.value = String(val % 60);
+    var ch = function () { onChange(Number(hh.value) * 60 + Number(mm.value)); };
+    hh.addEventListener('change', ch);
+    mm.addEventListener('change', ch);
+    return h('span', { class: 'tsel' }, [hh, h('span', { text: ':' }), mm]);
+  }
+  function renderSheet() {
+    var box = $('sheetview');
+    box.textContent = '';
+    box.hidden = !ui.sheet || !!ui.ci;
+    if (box.hidden) return;
+    var card = h('div', { class: 'card' });
+    var foot = [];
+    if (ui.sheet === 'pt') {
+      var pt = ui.ptDraft;
+      card.appendChild(h('p', { class: 'foot', text: '大学の時間割に合わせて直します。講義後チェックは、終わりの時刻を過ぎると出ます。時間割の表の時刻もこれに変わります。' }));
+      card.appendChild(h('div', { class: 'ptrows' }, pt.map(function (x, i) {
+        return h('div', { class: 'ptrow' }, [
+          h('b', { text: (i + 1) + '限' }),
+          timeSelect(x[0], function (v) { x[0] = v; }, (i + 1) + '限の始まり'),
+          h('span', { class: 'til', text: '〜' }),
+          timeSelect(x[1], function (v) { x[1] = v; }, (i + 1) + '限の終わり')
+        ]);
+      })));
+      var links = [];
+      if (pt.length < 9) links.push(h('button', { type: 'button', class: 'link', text: '＋ ' + (pt.length + 1) + '限を足す', onclick: function () {
+        var last = pt[pt.length - 1];
+        var st = Math.min(last[1] + 10, 1439 - 90);
+        pt.push([st, st + 90]);
+        render();
+      } }));
+      if (pt.length > 5) links.push(h('button', { type: 'button', class: 'link', text: pt.length + '限を消す', onclick: function () { pt.pop(); render(); } }));
+      links.push(h('button', { type: 'button', class: 'link', text: '最初の時刻に戻す', onclick: function () { ui.ptDraft = DEFAULT_PT.map(function (x) { return [x[0], x[1]]; }); render(); } }));
+      card.appendChild(h('div', { class: 'acts ptlinks' }, links));
+      foot.push(h('button', { type: 'button', class: 'btn primary', text: '保存する', onclick: function () {
+        for (var i = 0; i < pt.length; i++) {
+          if (pt[i][0] >= pt[i][1]) { ui.sheetMsg = (i + 1) + '限の終わりが、始まりより前になっています。'; render(); return; }
+          if (i > 0 && pt[i - 1][1] > pt[i][0]) { ui.sheetMsg = (i + 1) + '限の始まりが、' + i + '限の終わりより前になっています。'; render(); return; }
+        }
+        var same = pt.length === DEFAULT_PT.length && pt.every(function (x, k) { return x[0] === DEFAULT_PT[k][0] && x[1] === DEFAULT_PT[k][1]; });
+        if (same) delete state.pt; else state.pt = pt.map(function (x) { return [x[0], x[1]]; });
+        ui.sheet = null;
+        ui.toast = { text: '時限の時刻を保存しました' };
+        changed();
+        render();
+      } }));
+    } else if (ui.sheet === 'add') {
+      var d = ui.addDraft;
+      var nm = h('input', { type: 'text', id: 'addname', maxlength: '40', placeholder: '例：中国語I会話', value: d.name });
+      nm.addEventListener('input', function () { d.name = nm.value; });
+      card.appendChild(h('div', { class: 'qg' }, [h('label', { class: 'qt', for: 'addname', text: '講義名' }), nm]));
+      // slot picker (a small timetable)
+      var days = [1, 2, 3, 4, 5];
+      var anySat = state.courses.some(function (c) { return slotsOf(c).some(function (v) { return Math.floor(v / 10) === 6; }); }) || ui.ttFull;
+      if (anySat) days.push(6);
+      var maxP = Math.max(5, ui.ttFull ? periodTimes().length : 5);
+      state.courses.forEach(function (c) { slotsOf(c).forEach(function (v) { if (v % 10 > maxP) maxP = v % 10; }); });
+      maxP = Math.min(maxP, periodTimes().length);
+      var g = h('div', { class: 'pick', style: 'grid-template-columns: 24px repeat(' + days.length + ', minmax(0, 1fr))' }, [h('span')].concat(days.map(function (w) { return h('span', { class: 'pickh', text: DAYS[w] }); })));
+      for (var p = 1; p <= maxP; p++) {
+        g.appendChild(h('span', { class: 'pickp', text: String(p) }));
+        days.forEach(function (w) {
+          var v = w * 10 + p;
+          var other = null;
+          state.courses.forEach(function (c) { if (!other && slotsOf(c).indexOf(v) >= 0) other = c; });
+          var on = d.slots.indexOf(v) >= 0;
+          g.appendChild(h('button', { type: 'button', class: 'pickc' + (on ? ' on' : '') + (other ? ' taken' : ''), 'aria-pressed': on ? 'true' : 'false', 'aria-label': DAYS[w] + '曜' + p + '限' + (other ? '（' + other.name + 'が入っています）' : ''), onclick: function () {
+            var k = d.slots.indexOf(v);
+            if (k >= 0) d.slots.splice(k, 1); else { d.slots.push(v); d.odOn = false; d.od = -1; }
+            render();
+          } }, [h('span', { text: on ? '選択' : (other ? cellName(other.name) : '') })]));
+        });
+      }
+      var chosen = d.slots.slice().sort(function (a, b) { return slotKey(a) - slotKey(b); }).map(function (v) { return DAYS[Math.floor(v / 10)] + (v % 10); });
+      card.appendChild(h('div', { class: 'qg' }, [
+        h('p', { class: 'qt' }, ['曜日と時限', h('span', { class: 'qnote', text: '（押して選ぶ・いくつでも）' })]),
+        g,
+        h('p', { class: 'foot', text: chosen.length ? '選んだコマ：' + chosen.join('・') : 'まだ選んでいません' })
+      ]));
+      // on-demand
+      var odKids = [h('p', { class: 'qt', text: '時限のない講義（オンデマンドなど）' })];
+      odKids.push(h('div', { class: 'opts' }, [h('button', { type: 'button', class: 'opt' + (d.odOn ? ' on' : ''), 'aria-pressed': d.odOn ? 'true' : 'false', text: '時限なしにする', onclick: function () {
+        d.odOn = !d.odOn;
+        if (d.odOn) d.slots = []; else d.od = -1;
+        render();
+      } })]));
+      if (d.odOn) {
+        odKids.push(h('p', { class: 'foot', text: '講義後チェックで聞く曜日を選びます' }));
+        odKids.push(h('div', { class: 'opts' }, [1, 2, 3, 4, 5, 6, 0].map(function (w) {
+          var on = d.od === w;
+          return h('button', { type: 'button', class: 'opt small' + (on ? ' on' : ''), 'aria-pressed': on ? 'true' : 'false', text: DAYS[w], onclick: function () { d.od = on ? -1 : w; render(); } });
+        })));
+      } else {
+        odKids.push(h('p', { class: 'foot', text: '選ぶと、講義後チェックで聞く曜日を選べます' }));
+      }
+      card.appendChild(h('div', { class: 'qg' }, odKids));
+      var rm = h('input', { type: 'text', id: 'addroom', maxlength: '20', placeholder: '例：大講義室、205', value: d.room });
+      rm.addEventListener('input', function () { d.room = rm.value; });
+      card.appendChild(h('div', { class: 'qg' }, [h('label', { class: 'qt', for: 'addroom' }, ['教室', h('span', { class: 'qnote', text: '（任意）' })]), rm]));
+      foot.push(h('button', { type: 'button', class: 'btn primary', text: '追加する', onclick: function () {
+        var name = (d.name || '').replace(/\s+/g, ' ').trim();
+        if (!name) { ui.sheetMsg = '講義名を入れてください。'; render(); var f = $('addname'); if (f) f.focus(); return; }
+        if (state.courses.some(function (c) { return c.name.toLowerCase() === name.toLowerCase(); })) { ui.sheetMsg = '同じ名前の講義がすでにあります。時間割の表から、その講義を押して直してください。'; render(); return; }
+        if (state.courses.length >= 30) { ui.sheetMsg = '講義は30件まで追加できます。'; render(); return; }
+        var c = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), n: name, name: name, a: ymd(todayDate()), col: freeColor(state.courses) };
+        if (d.slots.length) c.s = d.slots.slice();
+        if (d.odOn && d.od >= 0) c.od = d.od;
+        var room = (d.room || '').replace(/\s+/g, ' ').trim();
+        if (room) c.r = room.slice(0, 20);
+        state.courses.push(c);
+        ui.sheet = null;
+        ui.toast = { text: '「' + name + '」を追加しました' };
+        changed();
+        render();
+      } }));
+    }
+    box.appendChild(card);
+    box.appendChild(h('p', { class: 'msg' + (ui.sheetMsg ? '' : ' vh'), role: 'status', 'aria-live': 'polite', text: ui.sheetMsg || '' }));
+    foot.push(h('button', { type: 'button', class: 'link', text: 'やめる', onclick: closeSheet }));
+    box.appendChild(h('div', { class: 'nav card-foot' }, foot));
+  }
+
   function render() {
     var today = todayDate();
+    applyPeriods();
     if (ui.loading) {
-      ['main', 'settings', 'banner', 'view-btn', 'checkin'].forEach(function (id) { $(id).hidden = true; });
+      ['main', 'settings', 'banner', 'view-btn', 'checkin', 'sheetview'].forEach(function (id) { $(id).hidden = true; });
       $('stats').textContent = (today.getMonth() + 1) + '月' + today.getDate() + '日 ' + DAYS[today.getDay()] + '曜日';
       $('storage').textContent = '読み込み中…';
       return;
@@ -2760,18 +2940,21 @@ details.panel { border-radius: 12px; }
     var hasTT = state.courses.some(function (c) { return hasSchedule(c); });
     var settings = ui.view === 'settings' || !state.courses.length;
     $('ci-open').hidden = true;
-    $('view-btn').hidden = !!ui.ci || !state.courses.length;
+    var modal = !!(ui.ci || ui.sheet);
+    document.body.classList.toggle('modal', !!ui.sheet);
+    $('view-btn').hidden = modal || !state.courses.length;
     $('view-label').textContent = settings ? '戻る' : '時間割';
-    $('htitle').textContent = ui.ci ? '講義後チェック' : (settings ? '時間割' : '今日');
-    $('main').hidden = !!ui.ci || settings;
-    $('settings').hidden = !!ui.ci || !settings;
+    $('htitle').textContent = ui.ci ? '講義後チェック' : ui.sheet === 'pt' ? '時限の時刻' : ui.sheet === 'add' ? '講義を追加' : (settings ? '時間割' : '今日');
+    $('main').hidden = modal || settings;
+    $('settings').hidden = modal || !settings;
     var tk = ui.takeover;
-    $('tkbar').hidden = !!ui.ci || !tk;
+    $('tkbar').hidden = modal || !tk;
     if (tk) $('tktext').textContent = 'ログインする前にこのブラウザで入れた内容（講義 ' + tk.courses.length + '件・課題など ' + (Array.isArray(tk.items) ? tk.items.length : 0) + '件）があります。このアカウントに引き継ぎますか？';
-    $('exbar').hidden = !!ui.ci || !(state.courses.some(function (c) { return c.ex; }) || state.items.some(function (i) { return i.ex; }));
-    renderBanner(today, settings);
+    $('exbar').hidden = modal || !(state.courses.some(function (c) { return c.ex; }) || state.items.some(function (i) { return i.ex; }));
+    renderBanner(today, settings || !!ui.sheet);
     renderCheckin(today);
-    if (!ui.ci) {
+    renderSheet();
+    if (!modal) {
       renderForm();
       renderQuick();
       renderToast();
@@ -2942,6 +3125,7 @@ details.panel { border-radius: 12px; }
     try { localStorage.removeItem(LS_KEY); } catch (e) { /* ignore */ }
     render();
   });
+  $('addc').addEventListener('click', function () { openSheet('add'); });
   $('exdel').addEventListener('click', function () {
     // Only the example rows go. An example course the person has put their own items on is kept as a normal course.
     state.items = state.items.filter(function (i) { return !i.ex; });
