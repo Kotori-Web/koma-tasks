@@ -521,6 +521,12 @@ details.panel { border-radius: 12px; }
 .ttc { border-radius: 8px; padding: 8px 4px; }
 .ttc.empty { background: none; border: 1px dashed var(--line-strong); }
 .ttplus { display: inline-flex; color: var(--muted); }
+/* 時限の列：開始の下に終了の時刻（少し薄く） */
+.ttp { gap: 1px; font-variant-numeric: tabular-nums; }
+.ttp b { margin-bottom: 2px; }
+.ttp .ttend { opacity: 0.7; }
+.ttp .ttend { text-align: center; }
+.ttp .ttend::before { content: "〜"; display: block; line-height: 1; font-size: 9px; text-align: center; }
 </style>
 
 <main class="wrap">
@@ -1777,7 +1783,12 @@ details.panel { border-radius: 12px; }
     days.forEach(function (w) { g.appendChild(h('span', { class: 'tth' + (w === wdNow ? ' now' : ''), text: DAYS[w] })); });
     for (var p = 1; p <= maxP; p++) {
       var m = PERIOD_START[p];
-      g.appendChild(h('span', { class: 'ttp' }, [h('b', { text: String(p) }), h('small', { text: pad(Math.floor(m / 60)) + ':' + pad(m % 60) })]));
+      var me = PERIOD_END[p];
+      g.appendChild(h('span', { class: 'ttp', 'aria-label': p + '限 ' + Math.floor(m / 60) + '時' + pad(m % 60) + '分から' + (me ? Math.floor(me / 60) + '時' + pad(me % 60) + '分まで' : '') }, [
+        h('b', { text: String(p) }),
+        h('small', { text: pad(Math.floor(m / 60)) + ':' + pad(m % 60) }),
+        me ? h('small', { class: 'ttend', text: pad(Math.floor(me / 60)) + ':' + pad(me % 60) }) : null
+      ]));
       days.forEach(function (w) {
         var v = w * 10 + p;
         var c = null;
