@@ -515,6 +515,12 @@ details.panel { border-radius: 12px; }
 .tcell .tr, .tcell .tk, .tcell .tp { font-size: 11px; }
 .tcell .ts { font-size: 10.5px; }
 .tcell { min-height: 0; padding: 9px 10px; }
+
+/* 時間割の表：空きコマは塗らずに点線だけ、＋は線のアイコン、角丸8・内側の余白8 */
+.ico { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ttc { border-radius: 8px; padding: 8px 4px; }
+.ttc.empty { background: none; border: 1px dashed var(--line-strong); }
+.ttplus { display: inline-flex; color: var(--muted); }
 </style>
 
 <main class="wrap">
@@ -714,6 +720,17 @@ details.panel { border-radius: 12px; }
   function fmt(d) { return (d.getMonth() + 1) + '/' + d.getDate() + '（' + DAYS[d.getDay()] + '）'; }
   function newId() { return 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
   function todayDate() { var t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); }
+  // Line icon used in the timetable's empty cells (24px grid, 2px stroke).
+  function plusIcon() {
+    var NS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('class', 'ico');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    ['M12 5v14', 'M5 12h14'].forEach(function (d) { var p = document.createElementNS(NS, 'path'); p.setAttribute('d', d); svg.appendChild(p); });
+    return svg;
+  }
   function h(tag, attrs, kids) {
     var e = document.createElement(tag);
     if (attrs) {
@@ -1776,7 +1793,7 @@ details.panel { border-radius: 12px; }
         }
         if (!c) {
           var picking = ui.addSlot === v;
-          g.appendChild(h('button', { type: 'button', class: 'ttc empty' + (picking ? ' picking' : ''), 'aria-label': DAYS[w] + '曜' + p + '限に講義を入れる', onclick: function () { ui.addSlot = picking ? null : v; render(); } }, [h('span', { class: 'ttplus', 'aria-hidden': 'true', text: '＋' })]));
+          g.appendChild(h('button', { type: 'button', class: 'ttc empty' + (picking ? ' picking' : ''), 'aria-label': DAYS[w] + '曜' + p + '限に講義を入れる', onclick: function () { ui.addSlot = picking ? null : v; render(); } }, [h('span', { class: 'ttplus', 'aria-hidden': 'true' }, [plusIcon()])]));
           return;
         }
         var cid = c.id;
