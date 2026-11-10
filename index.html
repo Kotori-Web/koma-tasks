@@ -547,6 +547,30 @@ body.modal #lsbar, body.modal #exbar { display: none !important; }
 .tsel { display: inline-flex; align-items: center; gap: 2px; }
 .tsel select { min-width: 0; padding: 0 6px; font-variant-numeric: tabular-nums; }
 .ptlinks { gap: 4px 16px; }
+
+/* 読み込み中：中身の形の薄い枠（スケルトン） */
+.skel { display: grid; gap: 16px; }
+.skel[hidden] { display: none; }
+.sk { background: var(--line); border-radius: 12px; }
+.sk-hero { height: 136px; border-radius: 16px; }
+.sk-h { height: 14px; width: 30%; border-radius: 6px; }
+.sk-rows { display: grid; gap: 8px; }
+.sk-row { height: 56px; }
+/* 動き：意味のある所だけ短く。「視差効果を減らす」がオンなら出さない */
+@media (prefers-reduced-motion: no-preference) {
+  .sk { animation: skpulse 1.2s ease-in-out infinite; }
+  @keyframes skpulse { 50% { opacity: .55; } }
+  .btn, .opt, .pickc, .ttc, .toast .undo, .hbtn { transition: transform 120ms ease, background-color 150ms ease, border-color 150ms ease; }
+  .btn:active, .opt:active, .pickc:active, .ttc:active, .toast .undo:active, .hbtn:active { transform: scale(.97); }
+  .item .ring i { transition: background-color 150ms ease, border-color 150ms ease; }
+  .item .ring[aria-checked="true"] i { animation: ringpop 200ms ease-out; }
+  @keyframes ringpop { 0% { transform: scale(.8); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+  .toast { animation: toastin 200ms ease-out; }
+  @keyframes toastin { from { opacity: 0; transform: translateY(12px); } }
+  /* 講義後チェック・追加の画面は、開いたときだけ下から上がる */
+  #checkin, #sheetview { animation: ciin 420ms cubic-bezier(.34, 1.25, .64, 1); }
+  @keyframes ciin { from { opacity: 0; transform: translateY(64px); } }
+}
 </style>
 
 <main class="wrap">
@@ -574,6 +598,11 @@ body.modal #lsbar, body.modal #exbar { display: none !important; }
     <button type="button" class="btn small" id="exdel">例を削除</button>
   </div>
 
+  <div class="skel" id="skel" hidden aria-hidden="true">
+    <div class="sk sk-hero"></div>
+    <div class="sk sk-h"></div>
+    <div class="sk-rows"><div class="sk sk-row"></div><div class="sk sk-row"></div><div class="sk sk-row"></div></div>
+  </div>
   <section class="hero" id="banner" hidden aria-label="次にやること"></section>
 
   <section class="ci" id="checkin" hidden aria-label="講義後チェック"></section>
@@ -2931,6 +2960,7 @@ body.modal #lsbar, body.modal #exbar { display: none !important; }
   function render() {
     var today = todayDate();
     applyPeriods();
+    $('skel').hidden = !ui.loading;
     if (ui.loading) {
       ['main', 'settings', 'banner', 'view-btn', 'checkin', 'sheetview'].forEach(function (id) { $(id).hidden = true; });
       $('stats').textContent = (today.getMonth() + 1) + '月' + today.getDate() + '日 ' + DAYS[today.getDay()] + '曜日';
